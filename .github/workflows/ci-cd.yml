@@ -90,7 +90,17 @@ jobs:
 
       - name: Push Docker image to ECR
         run: |
-          docker push 789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app:${{ github.sha }}
+          IMAGE_TAG="${{ github.sha }}"
+          ECR_REPO="789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app"
+
+          if aws ecr describe-images \
+            --repository-name flask-student-app \
+            --region us-east-1 \
+            --image-ids imageTag="$IMAGE_TAG" > /dev/null 2>&1; then
+            echo "Image $IMAGE_TAG already exists in ECR. Skipping push."
+          else
+            docker push "$ECR_REPO:$IMAGE_TAG"
+          fi
 
   deploy:
     needs: build
