@@ -92,7 +92,7 @@ jobs:
         run: |
           docker push 789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app:${{ github.sha }}
 
-            deploy:
+  deploy:
     needs: build
     runs-on: ubuntu-latest
 
