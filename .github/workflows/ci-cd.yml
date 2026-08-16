@@ -9,6 +9,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      MONGO_URI: mongodb://localhost:27017/test_student_db
+      SECRET_KEY: ci-test-secret
+
     services:
       mongodb:
         image: mongo:latest
