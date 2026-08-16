@@ -91,3 +91,66 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push 789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app:${{ github.sha }}
+
+            deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          IMAGE_TAG: ${{ github.sha }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: MONGO_URI,SECRET_KEY,IMAGE_TAG
+          script: |
+            set -e
+
+            echo "Logging in to Amazon ECR..."
+
+            aws ecr get-login-password --region us-east-1 | \
+              sudo docker login \
+              --username AWS \
+              --password-stdin 789193817635.dkr.ecr.us-east-1.amazonaws.com
+
+            echo "Pulling image..."
+
+            sudo docker pull \
+              789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app:${IMAGE_TAG}
+
+            echo "Stopping existing container..."
+
+            sudo docker rm -f flask-student-app || true
+
+            echo "Starting new container..."
+
+            sudo docker run -d \
+              --name flask-student-app \
+              --restart unless-stopped \
+              -p 5000:5000 \
+              -e MONGO_URI="$MONGO_URI" \
+              -e SECRET_KEY="$SECRET_KEY" \
+              789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app:${IMAGE_TAG}
+
+            echo "Waiting for application..."
+
+            for i in {1..30}; do
+              if curl -fsS http://localhost:5000/health; then
+                echo "Health check passed!"
+                exit 0
+              fi
+
+              echo "Application not ready yet. Waiting..."
+              sleep 2
+            done
+
+            echo "Health check failed!"
+
+            sudo docker logs flask-student-app
+
+            exit 1
