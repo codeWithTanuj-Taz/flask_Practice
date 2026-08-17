@@ -164,3 +164,104 @@ jobs:
             sudo docker logs flask-student-app
 
             exit 1
+
+  notification:
+    needs:
+      - test
+      - quality
+      - build
+      - deploy
+
+    if: ${{ always() }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send success email
+        if: |
+          needs.test.result == 'success' &&
+          needs.quality.result == 'success' &&
+          needs.build.result == 'success' &&
+          needs.deploy.result == 'success'
+        uses: dawidd6/action-send-mail@v6
+        with:
+          server_address: ${{ secrets.SMTP_HOST }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "SUCCESS - Flask CI/CD Pipeline"
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.SMTP_USERNAME }}
+          body: |
+            Flask Student Registration CI/CD Pipeline
+
+            STATUS: SUCCESS
+
+            Repository:
+            ${{ github.repository }}
+
+            Branch:
+            ${{ github.ref_name }}
+
+            Commit:
+            ${{ github.sha }}
+
+            Docker Image:
+            789193817635.dkr.ecr.us-east-1.amazonaws.com/flask-student-app:${{ github.sha }}
+
+            Deployment:
+            Amazon EC2
+
+            Pipeline Run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Test: SUCCESS
+            Quality: SUCCESS
+            Build: SUCCESS
+            Deploy: SUCCESS
+
+            The application was successfully deployed
+            and passed the health check.
+
+
+      - name: Send failure email
+        if: |
+          needs.test.result != 'success' ||
+          needs.quality.result != 'success' ||
+          needs.build.result != 'success' ||
+          needs.deploy.result != 'success'
+        uses: dawidd6/action-send-mail@v6
+        with:
+          server_address: ${{ secrets.SMTP_HOST }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "FAILURE - Flask CI/CD Pipeline"
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.SMTP_USERNAME }}
+          body: |
+            Flask Student Registration CI/CD Pipeline
+
+            STATUS: FAILURE
+
+            Repository:
+            ${{ github.repository }}
+
+            Branch:
+            ${{ github.ref_name }}
+
+            Commit:
+            ${{ github.sha }}
+
+            Pipeline Run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Job Results:
+
+            Test:   ${{ needs.test.result }}
+            Quality: ${{ needs.quality.result }}
+            Build:  ${{ needs.build.result }}
+            Deploy: ${{ needs.deploy.result }}
+
+            Please open the GitHub Actions run above
+            to investigate the failed stage.
